@@ -47,13 +47,40 @@ Condensed into the README's Limitations section at the end.
 - Stage durations are in hours. In days, payment approval would round to
   zero almost everywhere.
 
-- Sanity check before Phase 4: late rate 6.77%, on-time 93.2% of delivered
-  orders. SQL in Phase 4 is the official source.
+- Sanity check on the cleaned data: late rate 6.77%, on-time 93.2% of
+  delivered orders. The SQL analysis is the official source for this figure.
+
+### clean_order_items.py
+
+- The carrier handoff date comes from data/processed/orders.parquet, not from
+  the raw CSV. One source of truth, and it makes clean_orders.py a prerequisite.
+
+- The merge is validated as many-to-one, so a duplicate order_id in orders would
+  raise instead of silently multiplying rows. Row count after the merge is
+  112 650, unchanged.
+
+- missed_shipping_deadline is NA when the carrier date is missing (1 194 items),
+  never False. Same rule as is_late.
+
+- 10 423 of the 111 456 items with a known flag (9.35%) were handed to the
+  carrier after the seller's deadline. That is higher than the 6.77% of orders
+  delivered late, which suggests the promised delivery date carries some slack.
+  The two rates sit on different grains - items vs orders - so they can only be
+  compared properly once items are aggregated to order level in the SQL
+  analysis.
+
+- freight_value has 383 zeros (0.34%). Free shipping is a normal seller
+  promotion, so a zero cost is plausible - unlike a zero duration. No action
+  taken; the column is left as is.
+
+- The date comparison here is a local function rather than a shared helper,
+  even though clean_orders.py does something similar. Two uses were not enough
+  to justify a shared module; revisit if a third one appears.
 
 ### Open questions
 
-- Seller scorecard (Phase 4) needs a minimum order count per seller,
-  otherwise sellers with 3 orders will top the list.
+- The seller scorecard will need a minimum order count per seller, otherwise
+  sellers with 3 orders will top the list.
 
 - clean_orders.py is run from the cleaning/ folder (paths start with ../),
   while pytest is run from the project root. Both work, but README's How to
