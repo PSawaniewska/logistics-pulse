@@ -77,6 +77,45 @@ Condensed into the README's Limitations section at the end.
   even though clean_orders.py does something similar. Two uses were not enough
   to justify a shared module; revisit if a third one appears.
 
+### clean_geography.py
+
+- geolocation is reduced to one coordinate pair per zip code prefix, using the
+  median of lat and lng. The median is used instead of the mean because a single
+  badly geocoded point would pull an average away from the real location.
+
+- 31 rows across 20 zip prefixes sit far outside Brazil - one as far as
+  longitude +121, which is the eastern hemisphere. These are dropped before
+  aggregating.
+
+- Checked whether those could be genuine foreign orders rather than bad
+  coordinates. They cannot: customer_state has exactly 27 values, which is
+  Brazil's 26 states plus the Federal District, and 16 of the 20 affected
+  prefixes also carry valid Brazilian coordinates in their other rows. One zip
+  prefix cannot be in two hemispheres at once.
+
+- 4 zip prefixes had only bad coordinates and disappear after filtering, leaving
+  19 011 of 19 015. Customers and sellers in those prefixes get no distance.
+
+- distance_km uses the haversine formula and is written to its own file,
+  order_distances.parquet, keyed by order_id and order_item_id. It is not added
+  to order_items.parquet, so neither script overwrites the other's output.
+
+- The grain is the order item, not the order: one order can have several sellers
+  in different parts of the country.
+
+- 555 of 112 650 items (0.49%) have no distance, because one of the two zip
+  prefixes involved has no coordinates.
+
+- Distances: median 432 km, mean 597 km, max 3 579 km. The maximum sits below
+  Brazil's longest diagonal of roughly 4 000 km - a quick check that the formula
+  returns real distances and not nonsense.
+
+- Two limitations for any analysis that uses distance. It is a straight line,
+  not a road distance, so real transport distance is longer. And it is measured
+  between zip prefix centres, so two addresses inside the same prefix come out
+  as 0 km - anything below a few tens of kilometres is resolution noise rather
+  than signal.
+
 ### Open questions
 
 - The seller scorecard will need a minimum order count per seller, otherwise
