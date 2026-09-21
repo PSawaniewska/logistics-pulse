@@ -116,6 +116,24 @@ Condensed into the README's Limitations section at the end.
   as 0 km - anything below a few tens of kilometres is resolution noise rather
   than signal.
 
+### Payment data - checked and left out
+
+The raw data has a payments table. Before cleaning it, I checked whether the
+payment method explains late deliveries.
+
+Boleto is a Brazilian bank slip paid by hand at a bank, so it clears slowly:
+a median of 29 hours to approval, against 16 minutes for a card. But approval
+is the shortest step in the chain - transit takes 170 hours and seller
+preparation 44 hours.
+
+The result matters more than the cause. Boleto orders are late 7.3% of the
+time, card orders 6.7%. Across ~19,000 boleto orders that gap is about 120
+extra late orders out of ~6,500 - under 2%. The promised delivery date has
+enough slack to absorb the slower payment.
+
+Payment method is out of scope: there is no clean_payments.py and no payments
+table in the database.
+
 ### Open questions
 
 - The seller scorecard will need a minimum order count per seller, otherwise
