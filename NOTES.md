@@ -162,6 +162,37 @@ Condensed into the README's Limitations section at the end.
   The review is written after delivery, so the direction is clear. The SQL
   analysis is the official source for this figure.
 
+### clean_products.py
+
+- Category is the only thing this project needs from products: question 3 asks
+  whether delay concentrates in certain categories. Name length, description
+  length and photo count describe listing quality, not delivery.
+
+- Dropping those columns also removes the "lenght" typos in Olist's own column
+  names. There is nothing left to rename.
+
+- Weight and dimensions were measured before being dropped. Heavier items do
+  run late slightly more often, but the gap between the lightest and the
+  heaviest quarter of items is only about one point.
+
+- Weight was left out anyway, because category already carries most of that
+  effect - furniture and appliances are both heavy and slow - and a category
+  name is something a logistics team can act on, while a weight bracket is not.
+
+- Two of the 73 categories are missing from Olist's translation table:
+  pc_gamer and portateis_cozinha_e_preparadores_de_alimentos. Both are
+  translated in the script. Falling back to the Portuguese name would leave two
+  languages in one column.
+
+- Categories are mapped through a lookup rather than a merge. A lookup cannot
+  multiply rows, and an untranslated category would stay visibly empty instead
+  of quietly disappearing.
+
+- 610 products have no category at all and keep an empty one. Same rule as
+  everywhere else: missing stays missing.
+
+- After cleaning: 32 951 rows, 73 categories, 610 products without one.
+
 ### Open questions
 
 - The seller scorecard will need a minimum order count per seller, otherwise
