@@ -116,23 +116,51 @@ Condensed into the README's Limitations section at the end.
   as 0 km - anything below a few tens of kilometres is resolution noise rather
   than signal.
 
-### Payment data - checked and left out
+### clean_payments.py - not written
 
-The raw data has a payments table. Before cleaning it, I checked whether the
-payment method explains late deliveries.
+- The payments table was checked before any cleaning, to see whether the
+  payment method explains late deliveries.
 
-Boleto is a Brazilian bank slip paid by hand at a bank, so it clears slowly:
-a median of 29 hours to approval, against 16 minutes for a card. But approval
-is the shortest step in the chain - transit takes 170 hours and seller
-preparation 44 hours.
+- Boleto is a Brazilian bank slip paid by hand at a bank, so it clears slowly:
+  a median of 29 hours to approval, against 16 minutes for a card. But approval
+  is the shortest step in the chain - transit takes 170 hours and seller
+  preparation 44 hours.
 
-The result matters more than the cause. Boleto orders are late 7.3% of the
-time, card orders 6.7%. Across ~19,000 boleto orders that gap is about 120
-extra late orders out of ~6,500 - under 2%. The promised delivery date has
-enough slack to absorb the slower payment.
+- The result matters more than the cause. Boleto orders are late 7.3% of the
+  time, card orders 6.7%. Across ~19 000 boleto orders that gap is about 120
+  extra late orders out of ~6 500 - under 2%.
 
-Payment method is out of scope: there is no clean_payments.py and no payments
-table in the database.
+- The promised delivery date has enough slack to absorb the slower payment, so
+  payment method is out of scope: there is no clean_payments.py and no payments
+  table in the database.
+
+### clean_reviews.py
+
+- The reviews table is not one row per order: 547 orders carry two or three
+  reviews, 1 098 rows in all.
+
+- A duplicate-row check finds nothing, because each review has its own id -
+  only the order id repeats. Joined as it is, the table would quietly multiply
+  those 547 orders.
+
+- The script keeps the review with the latest answer timestamp, which is the
+  customer's last word. An average was rejected: the score is a 1 to 5 scale
+  and an average produces values nobody gave.
+
+- review_answer_timestamp has no missing values, checked before relying on the
+  sort. An empty date sorts last and would be mistaken for the latest review.
+
+- The output keeps only order_id and review_score. Comment text answers none of
+  the questions this project asks, and the timestamps are only used to put the
+  reviews in order.
+
+- After cleaning: 98 673 rows, one per order. The score distribution is
+  unchanged - 77% are 4 or 5, as in the raw table - so the removed rows were
+  not concentrated in any one score.
+
+- Orders delivered late average 2.27 out of 5, against 4.29 for on-time orders.
+  The review is written after delivery, so the direction is clear. The SQL
+  analysis is the official source for this figure.
 
 ### Open questions
 
@@ -142,3 +170,7 @@ table in the database.
 - clean_orders.py is run from the cleaning/ folder (paths start with ../),
   while pytest is run from the project root. Both work, but README's How to
   Run must say this explicitly, or a fresh clone will fail on the CSV path.
+
+- reviews sit at order level while order_items sit at item level. Any query
+  joining the two must aggregate items to orders first, or the same score will
+  be counted once per item.
