@@ -1,207 +1,161 @@
 ﻿# Logistics Pulse - working notes
 
-Running log of data quality findings, decisions, and open questions.
-Condensed into the README's Limitations section at the end.
+Decisions, checks and limitations to use in the README. How the code works is
+explained in the code comments, not here.
 
-## Phase 1 - Setup & Exploration
+## Conventions
 
-- orders: 23 orders show a delivery date before the carrier handoff date -
-  no clear explanation, open question for clean_orders.py.
-- orders: 1 359 orders show carrier handoff before payment approval -
-  fast processing, minor, likely no action needed.
-- products: 610 rows missing category/name/description/photos together
-  (incomplete listings). A separate 2 rows missing physical dimensions.
-  Needs a decision in clean_products.py.
-- geolocation: many duplicate/near-duplicate rows per zip code (~52 rows
-  per code on average) - needs aggregating to one row per zip code before
-  distance calculations.
-- geolocation: 157 of 14 994 customer zip codes (1.0%) and 7 of 2 246
-  seller zip codes (0.3%) have no match - a few distance calculations
-  will end up missing, not a major gap.
+- Missing stays missing. The cleaning scripts leave unknown values empty
+  instead of filling them with False, zero or a placeholder. An unknown delay
+  counted as "on time" would make every headline number look better than it is.
 
-## Phase 2 - Cleaning
+## Cleaning
 
 ### clean_orders.py
 
-- delay_days uses dates, not timestamps. order_estimated_delivery_date is
-  always 00:00:00, order_delivered_customer_date has real times. Raw
-  timestamps would mark all 1 292 same-day deliveries as late and push the
-  late rate from 6.77% to 8.11%.
+- delay_days compares dates, not timestamps. The promised date is always
+  00:00:00, the delivery date has real times. Using raw timestamps marks
+  same-day deliveries as late and raises the late rate from 6.77% to 8.11%.
 
-- is_late is NA when delay_days is unknown, never False. 2 965 orders were
-  never delivered, plus 8 "delivered" ones with no delivery date. Marking
-  them False would make the baseline look better than it is.
+- The late rate covers delivered orders only. 2 965 orders never arrived, so
+  "93.2% on time" does not mean "93.2% of orders arrived".
 
-- Non-delivered orders are kept with delay_days NULL, not dropped. The late
-  rate covers delivered orders only - 6.77% of 96 470.
+- Negative stage times become empty. Two flags say which dates contradict each
+  other: carrier_before_approved (1 359 rows) and delivered_before_carrier
+  (23). Both were open questions after exploration.
 
-- Negative stage durations become NA, not zero. A negative value means the
-  two timestamps contradict each other. Two flags record which stage:
-  carrier_before_approved (1 359 rows) and delivered_before_carrier (23).
-  Closes both open questions from Phase 1.
+- delay_days is safe from the first flag but not from the second, because the
+  delivery date is part of the formula. 23 rows, kept and flagged.
 
-- delay_days is not affected by carrier_before_approved - neither column is
-  in the formula. It can be affected by delivered_before_carrier, because
-  the delivery date is in the formula. 23 rows, kept and flagged.
-
-- Stage durations are in hours. In days, payment approval would round to
-  zero almost everywhere.
-
-- Sanity check on the cleaned data: late rate 6.77%, on-time 93.2% of
-  delivered orders. The SQL analysis is the official source for this figure.
+- Stage times are in hours. In days, payment approval would round to zero
+  nearly everywhere.
 
 ### clean_order_items.py
 
-- The carrier handoff date comes from data/processed/orders.parquet, not from
-  the raw CSV. One source of truth, and it makes clean_orders.py a prerequisite.
+- The carrier date is read from the cleaned orders file, not the raw CSV, so
+  there is one source of truth for it. The cost is that clean_orders.py has to
+  run first.
 
-- The merge is validated as many-to-one, so a duplicate order_id in orders would
-  raise instead of silently multiplying rows. Row count after the merge is
-  112 650, unchanged.
+- Checked that adding it did not multiply rows: 112 650 items before and after.
 
-- missed_shipping_deadline is NA when the carrier date is missing (1 194 items),
-  never False. Same rule as is_late.
+- 9.35% of items missed the seller's deadline, against 6.77% of orders
+  delivered late. Sellers break their deadline more often than the customer
+  notices, so the promised date probably has spare time in it. The two rates
+  count different things - items and orders - so this is a lead, not a result.
 
-- 10 423 of the 111 456 items with a known flag (9.35%) were handed to the
-  carrier after the seller's deadline. That is higher than the 6.77% of orders
-  delivered late, which suggests the promised delivery date carries some slack.
-  The two rates sit on different grains - items vs orders - so they can only be
-  compared properly once items are aggregated to order level in the SQL
-  analysis.
+- freight_value has 383 zeros (0.34%). Free shipping is a normal promotion, so
+  a zero cost is fine - a zero duration would not be. Left as is.
 
-- freight_value has 383 zeros (0.34%). Free shipping is a normal seller
-  promotion, so a zero cost is plausible - unlike a zero duration. No action
-  taken; the column is left as is.
-
-- The date comparison here is a local function rather than a shared helper,
-  even though clean_orders.py does something similar. Two uses were not enough
-  to justify a shared module; revisit if a third one appears.
+- The date comparison here is a local function, not a shared helper, although
+  clean_orders.py does something similar. Two uses were not enough to justify
+  a shared module.
 
 ### clean_geography.py
 
-- geolocation is reduced to one coordinate pair per zip code prefix, using the
-  median of lat and lng. The median is used instead of the mean because a single
-  badly geocoded point would pull an average away from the real location.
+- One coordinate pair per zip code prefix, taken as the median of all its rows.
+  Median, not mean, because one badly geocoded point would pull an average away
+  from the real place.
 
-- 31 rows across 20 zip prefixes sit far outside Brazil - one as far as
-  longitude +121, which is the eastern hemisphere. These are dropped before
-  aggregating.
+- 31 rows in 20 prefixes sit outside Brazil, one at longitude +121. Checked
+  whether these could be real foreign orders. They cannot: customer_state holds
+  exactly Brazil's 27 regions, and 16 of those prefixes also have correct
+  Brazilian points in their other rows.
 
-- Checked whether those could be genuine foreign orders rather than bad
-  coordinates. They cannot: customer_state has exactly 27 values, which is
-  Brazil's 26 states plus the Federal District, and 16 of the 20 affected
-  prefixes also carry valid Brazilian coordinates in their other rows. One zip
-  prefix cannot be in two hemispheres at once.
-
-- 4 zip prefixes had only bad coordinates and disappear after filtering, leaving
-  19 011 of 19 015. Customers and sellers in those prefixes get no distance.
-
-- distance_km uses the haversine formula and is written to its own file,
-  order_distances.parquet, keyed by order_id and order_item_id. It is not added
-  to order_items.parquet, so neither script overwrites the other's output.
-
-- The grain is the order item, not the order: one order can have several sellers
-  in different parts of the country.
+- Checked the formula against the country: the longest distance is 3 579 km,
+  under Brazil's longest diagonal of about 4 000 km. Tens of thousands would
+  have meant a sign or radian error.
 
 - 555 of 112 650 items (0.49%) have no distance, because one of the two zip
-  prefixes involved has no coordinates.
+  prefixes has no coordinates.
 
-- Distances: median 432 km, mean 597 km, max 3 579 km. The maximum sits below
-  Brazil's longest diagonal of roughly 4 000 km - a quick check that the formula
-  returns real distances and not nonsense.
-
-- Two limitations for any analysis that uses distance. It is a straight line,
-  not a road distance, so real transport distance is longer. And it is measured
-  between zip prefix centres, so two addresses inside the same prefix come out
-  as 0 km - anything below a few tens of kilometres is resolution noise rather
-  than signal.
+- Distance is a straight line between prefix centres, not a road distance. The
+  real distance is longer, and two addresses in one prefix come out as 0 km.
+  Anything below a few tens of kilometres is noise, not signal.
 
 ### clean_payments.py - not written
 
-- The payments table was checked before any cleaning, to see whether the
-  payment method explains late deliveries.
+- Boleto is a bank slip paid by hand. It takes 29 hours to clear, against 16
+  minutes for a card. The delay is real, so the question was whether the
+  customer feels it.
 
-- Boleto is a Brazilian bank slip paid by hand at a bank, so it clears slowly:
-  a median of 29 hours to approval, against 16 minutes for a card. But approval
-  is the shortest step in the chain - transit takes 170 hours and seller
-  preparation 44 hours.
+- They do not. Boleto orders are late 7.3% of the time, cards 6.7%: about 120
+  extra late orders out of ~6 500, under 2%. The promised date has enough
+  spare time to absorb the slower payment.
 
-- The result matters more than the cause. Boleto orders are late 7.3% of the
-  time, card orders 6.7%. Across ~19 000 boleto orders that gap is about 120
-  extra late orders out of ~6 500 - under 2%.
-
-- The promised delivery date has enough slack to absorb the slower payment, so
-  payment method is out of scope: there is no clean_payments.py and no payments
-  table in the database.
+- So payment method is out of scope: no cleaning script and no table in the
+  database.
 
 ### clean_reviews.py
 
-- The reviews table is not one row per order: 547 orders carry two or three
-  reviews, 1 098 rows in all.
+- 547 orders have two or three reviews. A duplicate-row check finds nothing,
+  because every review has its own id and only the order id repeats. Joined as
+  it is, the table would quietly multiply those orders.
 
-- A duplicate-row check finds nothing, because each review has its own id -
-  only the order id repeats. Joined as it is, the table would quietly multiply
-  those 547 orders.
+- The script keeps the review with the latest answer date, the customer's last
+  word. An average was rejected: the score is a 1 to 5 scale, and an average
+  gives values nobody chose.
 
-- The script keeps the review with the latest answer timestamp, which is the
-  customer's last word. An average was rejected: the score is a 1 to 5 scale
-  and an average produces values nobody gave.
+- Checked that the answer dates have no gaps before sorting by them. An empty
+  date sorts last and would be taken for the latest review.
 
-- review_answer_timestamp has no missing values, checked before relying on the
-  sort. An empty date sorts last and would be mistaken for the latest review.
+- Checked that dropping those rows did not bend the data: the score
+  distribution is the same, still 77% fours and fives.
 
-- The output keeps only order_id and review_score. Comment text answers none of
-  the questions this project asks, and the timestamps are only used to put the
-  reviews in order.
+- The output keeps only order_id and review_score. Comment text answers none
+  of the questions this project asks.
 
-- After cleaning: 98 673 rows, one per order. The score distribution is
-  unchanged - 77% are 4 or 5, as in the raw table - so the removed rows were
-  not concentrated in any one score.
-
-- Orders delivered late average 2.27 out of 5, against 4.29 for on-time orders.
-  The review is written after delivery, so the direction is clear. The SQL
-  analysis is the official source for this figure.
+- Reviews are worth keeping: late orders average 2.27 out of 5, on-time orders
+  4.29. The review is written after delivery, so the gap points one way only.
 
 ### clean_products.py
 
-- Category is the only thing this project needs from products: question 3 asks
-  whether delay concentrates in certain categories. Name length, description
-  length and photo count describe listing quality, not delivery.
-
-- Dropping those columns also removes the "lenght" typos in Olist's own column
-  names. There is nothing left to rename.
+- Category is the only thing this project needs from products. Name length,
+  description length and photo count say something about the listing, not
+  about delivery.
 
 - Weight and dimensions were measured before being dropped. Heavier items do
-  run late slightly more often, but the gap between the lightest and the
-  heaviest quarter of items is only about one point.
+  run late a little more often, but category already covers most of it -
+  furniture and appliances are both heavy and slow. A category is also
+  something a logistics team can act on. A weight bracket is not.
 
-- Weight was left out anyway, because category already carries most of that
-  effect - furniture and appliances are both heavy and slow - and a category
-  name is something a logistics team can act on, while a weight bracket is not.
-
-- Two of the 73 categories are missing from Olist's translation table:
-  pc_gamer and portateis_cozinha_e_preparadores_de_alimentos. Both are
-  translated in the script. Falling back to the Portuguese name would leave two
+- Two of the 73 categories are missing from Olist's translation table and are
+  translated in the script. Keeping the Portuguese name would put two
   languages in one column.
 
-- Categories are mapped through a lookup rather than a merge. A lookup cannot
-  multiply rows, and an untranslated category would stay visibly empty instead
-  of quietly disappearing.
+- 610 products have no category, so any split by category leaves them out.
 
-- 610 products have no category at all and keep an empty one. Same rule as
-  everywhere else: missing stays missing.
+## Database
 
-- After cleaning: 32 951 rows, 73 categories, 610 products without one.
+### sql/schema.sql
 
-### Open questions
+- The schema describes the cleaned data, not the raw CSVs: no payments table,
+  and products holds only a category.
 
-- The seller scorecard will need a minimum order count per seller, otherwise
-  sellers with 3 orders will top the list.
+- The zip code columns have no foreign key to geolocation. 157 customer and 7
+  seller prefixes have no coordinates, and a foreign key would reject those
+  rows instead of leaving the distance unknown.
 
-- clean_orders.py is run from the cleaning/ folder (paths start with ../),
-  while pytest is run from the project root. Both work, but README's How to
-  Run must say this explicitly, or a fresh clone will fail on the CSV path.
+- All five source timestamps stay in orders, so every calculated column can be
+  checked against the dates it came from.
 
-- reviews sit at order level while order_items sit at item level. Any query
-  joining the two must aggregate items to orders first, or the same score will
-  be counted once per item.
+### database/load_data.py
+
+- The database is built from data/processed. To rebuild it, delete the .duckdb
+  file and run the script again.
+
+- Loading is also a check on the cleaning phase: every foreign key matched,
+  every primary key was unique and no CHECK failed. Row counts and empty-value
+  counts match the parquet files.
+
+## Open questions
+
+- The seller scorecard needs a minimum number of orders per seller, or sellers
+  with 3 orders will top the list.
+
+- Scripts in cleaning/ and database/ run from their own folder (paths start
+  with ../), pytest runs from the project root. README's How to Run has to say
+  this, or a fresh clone fails on the file paths.
+
+- reviews are one row per order, order_items one row per item. Any query
+  joining them must group items to orders first, or one score gets counted
+  once per item.
