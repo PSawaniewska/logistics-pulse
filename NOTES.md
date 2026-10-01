@@ -138,6 +138,10 @@ explained in the code comments, not here.
 - All five source timestamps stay in orders, so every calculated column can be
   checked against the dates it came from.
 
+- reviews has one row per order, order_items one row per item. Any query
+  joining them has to group the items up to the order first, or one review
+  score gets counted once per item.
+
 ### database/load_data.py
 
 - The database is built from data/processed. To rebuild it, delete the .duckdb
@@ -164,32 +168,34 @@ different periods. I rewrote that section.
 
 Decisions worth recording:
 
+- The original funnel ended with two seller questions: a scorecard naming the
+  sellers above a risk threshold, and a what-if asking how many late orders
+  would have been on time if the worst sellers had worked at the median. My
+  note at the time was that the scorecard would need a minimum number of orders
+  per seller, or sellers with 3 orders would top the list. Question 3b then
+  removed the ground under both: seller late rates sit flat around the baseline,
+  so there is no group to name and no worst segment to improve. I pointed both
+  questions at Rio instead. The what-if survived in shape - question 8 still
+  asks what would have happened at a baseline rate, but the baseline is the rest
+  of the country and the subject is a state.
+
 - Orders from 2016 stay in the first questions but are cut from everything that
   reads the timeline. There are 267 of them across three separate months, and
   one month holds a single order with a 100% late rate.
+
 - Rio is compared with the rest of the country, not with the national average.
   Sao Paulo is 40% of all orders, so comparing a state with the national average
   partly compares it with itself.
+
 - I checked whether the late rate fell after March 2018 because deliveries got
   faster or because the promised dates got longer. Deliveries got faster and the
   promises did not grow, so the improvement is real.
+
 - I dropped a query that split Rio's crisis by stage. Transport is four times
   larger than the other steps, so it was almost certain to come out on top
   before I ran it, and the recommendation does not depend on which stage failed.
+
 - I replaced a query that counted how many months each state ran at twice the
   rest of the country. A count cannot tell apart a state that broke from a state
   that was always bad. Showing the monthly rate for four states side by side
   made that difference visible.
-
-## Open questions
-
-- The seller scorecard needs a minimum number of orders per seller, or sellers
-  with 3 orders will top the list.
-
-- Scripts in cleaning/ and database/ run from their own folder (paths start
-  with ../), pytest runs from the project root. README's How to Run has to say
-  this, or a fresh clone fails on the file paths.
-
-- reviews are one row per order, order_items one row per item. Any query
-  joining them must group items to orders first, or one score gets counted
-  once per item.

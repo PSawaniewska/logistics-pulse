@@ -80,8 +80,11 @@ aggregated to one coordinate per zip prefix and used to measure the
 straight-line distance of every order item with the haversine formula.
 Reviews are deduplicated to the latest review per order.
 
-Three decisions shaped the numbers above:
+Four decisions are worth naming:
 
+- **Unknown stays unknown.** The cleaning scripts never fill a missing value
+  with False, zero or a placeholder. An unknown delay counted as on time would
+  make every number on this page look better than it is.
 - **Lateness compares dates, not timestamps.** The promised date carries no
   time of day, so comparing raw timestamps marks same-day deliveries as late
   and pushes the rate from 6.77% to 8.11%.
@@ -150,15 +153,24 @@ erDiagram
 prefixes have no coordinates, and a foreign key would reject those rows
 instead of leaving the distance unknown.
 
-**Analysis** (`notebooks/02_sql_analysis.ipynb`) answers eight business
-questions in SQL, each narrowing the previous one. Every query also lives in
-`sql/kpi_queries.sql`.
+**Analysis** (`notebooks/02_sql_analysis.ipynb`) works through eight questions,
+each one narrowing the last:
 
-Two things are worth calling out about the method. The funnel changed while
-the work was running: two questions originally aimed at sellers were
-redirected once the data showed sellers were flat. And a conclusion that Rio
-was permanently broken was withdrawn after the monthly view showed the problem
-had a start and an end. Both changes are recorded in `NOTES.md`.
+1. How many deliveries arrive late?
+2. Which stage of the journey creates the delay?
+3. Is it concentrated in a region, a seller or a product category?
+4. Does distance explain it?
+5. Is the problem permanent, or does it come and go?
+6. What happened in Rio de Janeiro?
+7. What does a late delivery cost?
+8. What should be done about it?
+
+Every query also lives in `sql/kpi_queries.sql`.
+
+The question list changed while the work was running. Two questions originally
+aimed at sellers were redirected to Rio once question 3 showed that sellers and
+categories are flat. `NOTES.md` records that and the other decisions taken
+along the way.
 
 ## Tech Stack
 
@@ -269,3 +281,9 @@ Open `notebooks/02_sql_analysis.ipynb` to read the analysis.
 Data from the [Olist Brazilian E-Commerce dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)
 on Kaggle, licensed under CC BY-NC-SA 4.0. Used here for educational and
 portfolio purposes only.
+
+---
+
+Built by Paulina Sawaniewska, moving from logistics into data analytics - which
+is why this project is about deliveries. Connect on
+[LinkedIn](https://www.linkedin.com/in/paulina-sawaniewska-278030407/).
