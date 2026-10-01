@@ -147,6 +147,40 @@ explained in the code comments, not here.
   every primary key was unique and no CHECK failed. Row counts and empty-value
   counts match the parquet files.
 
+### notebooks/02_sql_analysis.ipynb
+
+Eight business questions, answered against the DuckDB database.
+
+The questions changed while I was working. I wrote them before I had measured
+anything, and two of them pointed at sellers. Question 3 showed that sellers and
+product categories are flat - no group stands out - and that the whole problem
+is geographic. Keeping the seller questions would have meant answering something
+the data had already said no to, so I pointed them at Rio de Janeiro instead.
+
+The bigger change came later. I had decided that Rio was permanently broken.
+Then I looked month by month and saw that Rio was normal until October 2017 and
+normal again from April 2018. The 12.11% I had been using was an average of two
+different periods. I rewrote that section.
+
+Decisions worth recording:
+
+- Orders from 2016 stay in the first questions but are cut from everything that
+  reads the timeline. There are 267 of them across three separate months, and
+  one month holds a single order with a 100% late rate.
+- Rio is compared with the rest of the country, not with the national average.
+  Sao Paulo is 40% of all orders, so comparing a state with the national average
+  partly compares it with itself.
+- I checked whether the late rate fell after March 2018 because deliveries got
+  faster or because the promised dates got longer. Deliveries got faster and the
+  promises did not grow, so the improvement is real.
+- I dropped a query that split Rio's crisis by stage. Transport is four times
+  larger than the other steps, so it was almost certain to come out on top
+  before I ran it, and the recommendation does not depend on which stage failed.
+- I replaced a query that counted how many months each state ran at twice the
+  rest of the country. A count cannot tell apart a state that broke from a state
+  that was always bad. Showing the monthly rate for four states side by side
+  made that difference visible.
+
 ## Open questions
 
 - The seller scorecard needs a minimum number of orders per seller, or sellers
