@@ -1,4 +1,4 @@
-﻿# Logistics Pulse - working notes
+# Logistics Pulse - working notes
 
 Decisions, checks and limitations to use in the README. How the code works is
 explained in the code comments, not here.
@@ -199,3 +199,27 @@ Decisions worth recording:
   rest of the country. A count cannot tell apart a state that broke from a state
   that was always bad. Showing the monthly rate for four states side by side
   made that difference visible.
+
+- I checked the seller conclusion properly. The first query sorted by number of
+  late orders, which only shows the biggest sellers, whose rates sit near the
+  average by arithmetic. Sorted by rate with a 100-order floor, six of 210
+  sellers run above 15%. The conclusion changed from "no seller stands out" to
+  a measured proportion: those six carry about 120 late deliveries more than
+  the baseline, against 749 from Rio.
+
+- The counting approach I rejected for question 5 came back in question 8, and
+  that is not a contradiction. Counting months above a threshold cannot tell a
+  state that broke from a state that was always bad, which is why it was wrong
+  for finding episodes. Testing a proposed rule is a different job, and counting
+  is exactly right for it.
+
+- Running the rule against every state found a flaw in it. The absolute trigger
+  fired on states that were merely average in a month when the whole country was
+  bad - one state was better than the rest and still alerted. Adding a "half
+  again worse" condition to that trigger cut the alerts from 32 to 24 and
+  removed every one of those cases.
+
+- The three worst months are country wide, not only Rio. November 2017 came with
+  a 63% jump in order volume, so demand explains it. February and March 2018 did
+  not. I left that alone: the data holds nothing that could explain it, and Rio
+  at least has an address.

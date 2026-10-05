@@ -48,7 +48,7 @@ GROUP BY c.customer_state
 ORDER BY late_orders DESC;
 
 -- ----------------------------------------------------------------------
--- 3b. Late rate by seller
+-- 3b. Late rate by seller - the largest sellers first
 -- ----------------------------------------------------------------------
 
 SELECT
@@ -63,6 +63,25 @@ AND o.order_status = 'delivered'
 GROUP BY ot.seller_id
 ORDER BY late_orders DESC
 LIMIT 20;
+
+-- ----------------------------------------------------------------------
+-- 3b. Late rate by seller - by rate, with a volume floor
+-- ----------------------------------------------------------------------
+
+SELECT
+    ot.seller_id,
+    COUNT(DISTINCT o.order_id)                            AS orders,
+    COUNT(DISTINCT o.order_id) FILTER (WHERE o.is_late)   AS late_orders,
+    ROUND(COUNT(DISTINCT o.order_id) FILTER (WHERE o.is_late)
+          / COUNT(DISTINCT o.order_id) * 100, 2)          AS late_pct
+FROM orders o
+JOIN order_items ot ON o.order_id = ot.order_id
+WHERE o.is_late IS NOT NULL
+  AND o.order_status = 'delivered'
+GROUP BY ot.seller_id
+HAVING COUNT(DISTINCT o.order_id) >= 100
+ORDER BY late_pct DESC
+LIMIT 15;
 
 -- ----------------------------------------------------------------------
 -- 3c. Late rate by product category
@@ -344,3 +363,60 @@ SELECT
     ROUND(rj_late - rj_orders * rest_late_rate, 0)  AS excess_late
 FROM monthly
 ORDER BY month;
+
+-- ----------------------------------------------------------------------
+-- 8c. The rule applied to every state
+-- ----------------------------------------------------------------------
+
+WITH state_month AS (
+    SELECT
+        date_trunc('month', o.order_purchase_timestamp) AS month,
+        c.customer_state                                AS state,
+        COUNT(*)                                        AS orders,
+        COUNT(*) FILTER (WHERE o.is_late)               AS late_orders
+    FROM orders o
+    JOIN customers c ON o.customer_id = c.customer_id
+    WHERE o.order_status = 'delivered'
+      AND o.is_late IS NOT NULL
+      AND o.order_purchase_timestamp >= '2017-01-01'
+    GROUP BY month, state
+),
+
+country_month AS (
+    SELECT
+        month,
+        SUM(orders)      AS orders,
+        SUM(late_orders) AS late_orders
+    FROM state_month
+    GROUP BY month
+),
+
+compared AS (
+    SELECT
+        s.month,
+        s.state,
+        s.orders,
+        s.late_orders / s.orders                          AS state_rate,
+        (c.late_orders - s.late_orders)
+            / NULLIF(c.orders - s.orders, 0)              AS rest_rate
+    FROM state_month s
+    JOIN country_month c USING (month)
+    WHERE s.orders >= 100
+)
+
+SELECT
+    month,
+    state,
+    orders,
+    ROUND(state_rate * 100, 1)                  AS state_pct,
+    ROUND(rest_rate * 100, 1)                   AS rest_pct,
+    ROUND(state_rate / NULLIF(rest_rate, 0), 1) AS ratio,
+    CASE
+        WHEN state_rate >= 0.15 AND state_rate >= 2 * rest_rate THEN 'both'
+        WHEN state_rate >= 0.15                                 THEN 'absolute'
+        ELSE                                                         'relative'
+    END                                         AS triggered_by
+FROM compared
+WHERE state_rate >= 2 * rest_rate
+   OR (state_rate >= 0.15 AND state_rate >= 1.5 * rest_rate)
+ORDER BY month, state;

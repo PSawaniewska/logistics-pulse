@@ -26,46 +26,54 @@ promises each customer a delivery date, and a carrier takes the parcel the
 rest of the way. When a parcel arrives after the promised date the customer
 blames the marketplace, not the carrier, and says so in a review.
 
-This project answers four questions in order: how often does that happen,
-where does the delay come from, what does it cost, and what should be done
-about it.
+This project works through how often that happens, where the delay comes from,
+what it costs, and what should be done about it.
 
 ## Key Findings
 
 - **6.77%** of delivered orders arrive after the promised date - 6 534 out of
   96 470.
-- The time is lost **in transport**, not at the seller. A late order spends
-  629 hours in transit against 167 for an on-time one, while seller
-  preparation grows only from 43 to 74 hours.
-- **No seller and no product category stands out.** Both sit flat around the
-  6.8% baseline, so the problem is about where orders go, not who ships them.
-- Distance raises the risk - from 4.5% under 100 km to 11.6% above 1 500 km -
-  but it does not explain Rio de Janeiro. Compared with other states at the
-  same distance and in the same months, Rio ran **26.2% against Sao Paulo's
-  7.3%**.
+- The time is lost **in transport**: 629 hours for a late order against 167 for
+  an on-time one. No product category stands out and only a handful of sellers
+  do, so the problem is mostly about where orders go, not who ships them.
+- Distance raises the risk - 4.5% under 100 km to 11.6% above 1 500 km - but it
+  does not explain Rio de Janeiro: at the same distance and in the same months,
+  Rio ran **26.2% against Sao Paulo's 7.3%**.
 - **The problem comes and goes.** Three months - November 2017, February and
   March 2018 - hold **48%** of all late orders.
-- Rio was normal until October 2017, ran up to **5 times worse** than the rest
-  of the country for six months, and returned to normal in April 2018. The
-  episode produced **749 late deliveries** beyond what the rest of the
-  country's rate would have caused: **11.5% of every late order in the data**.
-- Delivery then got faster, from about **10 days to 7**, and the promised
-  window did not lengthen - so the improvement is real, not a looser promise.
-- A late delivery in Rio cost **2.39 review points**. Most of the damage is
-  done within the first week: 58.6% of orders 4 to 7 days late get one star,
+- Rio is not the worst state by rate, but it carries **22.9% of all late
+  orders** and its problem has a clear start and end: normal until October 2017,
+  up to 5 times worse than the rest of the country for six months, normal again
+  from April 2018. The episode produced **749 late deliveries** beyond what the
+  rest of the country's rate would have caused - **11.5% of every late order in
+  the data**.
+- Delivery then got faster, from about **10 days to 7**, with no upward drift in
+  the promised window - so the improvement is real.
+- A late delivery in Rio cost **2.39 review points**, and most of the damage is
+  done within the first week: 58.6% of orders 4 to 7 days late get one star
   against 6.6% of orders that arrive on time.
 
 ## Recommendation
 
-**Track the late rate by state each month against the rest of the country, and
-investigate any state that runs at twice that rate for two months running.**
+**Track the late rate by state each month against the rest of the country.
+Investigate any state with at least 100 orders that month which is twice as bad
+as the rest for two months running, or is above 15% and still half again worse
+than the rest.**
 
-Rio was at twice the rest of the country from November 2017 to March 2018, so
-the rule would have fired at the end of December. **426 of its 749 excess late
-deliveries - 57% - came after that**, worth about 1 020 review points.
+The first trigger catches a state pulling away from the rest. The second
+catches a month when the whole country degrades and nothing looks twice as bad,
+and the "half again" condition keeps it off states that were merely average.
 
-The rule finds the next episode sooner. It cannot explain this one: the data
-holds no carrier, no route and no delivery district.
+Rio crossed the first trigger in November 2017 and stayed over it until March
+2018. The rule would have fired at the end of December. 426 of its 749 excess
+late deliveries - 57% - came after that, worth about 1 020 review points.
+
+Run against every state, the rule fires 24 times in 20 months. It also flags
+Espirito Santo and Bahia from March 2018 onward, which this analysis did not
+examine. The three thresholds are chosen, not derived.
+
+The data holds no carrier, no route and no delivery district, so the rule finds
+the next episode sooner but cannot explain this one.
 
 ## Data & Methodology
 
@@ -268,11 +276,17 @@ Open `notebooks/02_sql_analysis.ipynb` to read the analysis.
   seasonal demand.
 - Review scores stand in for cost. There is no money in this dataset, so a
   late delivery can only be priced in review points.
+- The three worst months are country wide, not only Rio. November 2017 came
+  with a 63% jump in order volume, so demand explains it. February and March
+  2018 did not - volume was ordinary and the late rate still tripled. What
+  happened then is outside what this dataset can answer.
 - Outside sources point to one hypothesis worth testing: cargo theft in Rio
   state peaked in 2017 at a record 10 599 incidents, and a federal security
   intervention was decreed on 16 February 2018 with cargo theft among its
   targets. The period, the state and the stage all match the episode in this
   data - but matching timing is not proof.
+- The detection rule flags Espirito Santo and Bahia from March 2018 onward,
+  episodes this project did not examine.
 - Next: a Power BI dashboard that puts the detection rule above in front of
   someone who can act on it.
 
