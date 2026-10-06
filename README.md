@@ -207,16 +207,17 @@ logistics-pulse/
 │   ├── schema.sql                # tables, keys and constraints
 │   └── kpi_queries.sql           # every query from the analysis
 ├── database/
-│   └── load_data.py              # builds the DuckDB database from parquet
+│   ├── load_data.py              # builds the DuckDB database from parquet
+│   └── export_powerbi.py         # exports the Power BI star schema to parquet
 ├── notebooks/
 │   ├── 01_exploration.ipynb      # first look at the raw data
 │   └── 02_sql_analysis.ipynb     # the eight business questions
-├── analysis/                     # exports for the dashboard (in progress)
-├── powerbi/                      # dashboard file (in progress)
-├── data/
-│   ├── raw/                      # Olist CSV files, not in version control
+├── powerbi/                      # report file and screenshots (in progress)
+├── data/                         # none of this is in version control
+│   ├── raw/                      # Olist CSV files from Kaggle
 │   ├── processed/                # cleaned parquet files
-│   └── warehouse/                # the DuckDB database
+│   ├── warehouse/                # the DuckDB database
+│   └── powerbi/                  # the seven files the dashboard reads
 ├── conftest.py                   # pytest configuration
 ├── requirements.txt
 └── NOTES.md                      # decisions taken while building, and why
